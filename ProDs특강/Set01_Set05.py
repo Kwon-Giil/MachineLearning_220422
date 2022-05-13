@@ -89,15 +89,50 @@ print(st.pearsonr(tmp['TV'], tmp['Sales'])[0])
 # - 분석 시 결측치가 포함된 행은 제거한 후 진행하며, 회귀계수는 소수점 넷째 자리
 # 이하는 버리고 소수점 셋째 자리까지 기술하시오. (답안 예시) 0.123
 # =============================================================================
+from statsmodels.formula.api import ols
+from statsmodels.api import OLS, add_constant
 
+# 변수의 수가 많을 때를 대비해서
+v_lst = ['TV','Radio','Social_Media']
 
+# 폼을 미리 만들어준 다음
+form1 = 'Sales~' + '+'.join(v_lst)
 
+#세 개의 독립변수의 회귀계수를 큰 것에서부터 작은 것 순으로 기술
+q3_lm = ols(form1, df).fit()
 
+q3_lm.summary()
 
+q3_lm.params.index[q3_lm.pvalues < 0.05] # 영향력 있는 변수 목록 추출
 
+np.floor(q3_lm.params.drop('Intercept').sort_values(ascending=False).values*1000)/1000
+ 
+#정답 [ 3.562,  0.004, -0.004]
 
-
-
+#                              OLS Regression Results                            
+# ==============================================================================
+# Dep. Variable:                  Sales   R-squared:                       0.999
+# Model:                            OLS   Adj. R-squared:                  0.999
+# Method:                 Least Squares   F-statistic:                 1.505e+06
+# Date:                Fri, 13 May 2022   Prob (F-statistic):               0.00
+# Time:                        14:45:54   Log-Likelihood:                -11366.
+# No. Observations:                4546   AIC:                         2.274e+04
+# Df Residuals:                    4542   BIC:                         2.277e+04
+# Df Model:                           3                                         
+# Covariance Type:            nonrobust                                         
+# ================================================================================
+#                    coef    std err          t      P>|t|      [0.025      0.975]
+# --------------------------------------------------------------------------------
+# Intercept       -0.1340      0.103     -1.303      0.193      -0.336       0.068
+# TV               3.5626      0.003   1051.118      0.000       3.556       3.569
+# Radio           -0.0040      0.010     -0.406      0.685      -0.023       0.015
+# Social_Media     0.0050      0.025      0.199      0.842      -0.044       0.054
+# ==============================================================================
+# Omnibus:                        0.056   Durbin-Watson:                   1.998
+# Prob(Omnibus):                  0.972   Jarque-Bera (JB):                0.034
+# Skew:                          -0.001   Prob(JB):                        0.983
+# Kurtosis:                       3.013   Cond. No.                         149.
+# ==============================================================================
 
 #%%
 
@@ -397,15 +432,15 @@ print(export_text(dt, feature_names = var_list, decimals = 3))
 
 # (참고)
 # #1
- import pandas as pd
- import numpy as np
+import pandas as pd
+import numpy as np
 # #2
- from scipy.stats import ttest_rel
+from scipy.stats import ttest_rel
 # #3
- from sklearn.linear_model import LinearRegression
- 
- df_meat = pd.read_csv('DatasSet_04.csv')
- df_meat
+
+
+df_meat = pd.read_csv('Dataset_04.csv')
+df_meat
 
 #%%
 
@@ -422,7 +457,7 @@ df_Kmeat = df_meat[df_meat.LOCATION =='KOR']
 
 # df_Kmeat['Time'].value_counts() # data 탐색용
 
-print(round(df_meat.groupby('TIME')['Value'].sum().reset_index(drop = False).corr(),3))
+print(round(df_meat.groupby('TIME')['Value'].sum().reset_index(drop = False).corr(),))
 
 
 #%%
@@ -435,11 +470,62 @@ print(round(df_meat.groupby('TIME')['Value'].sum().reset_index(drop = False).cor
 # 적으시오. (알파벳 순서) (답안 예시) BEEF, PIG, POULTRY, SHEEP
 # =============================================================================
 
+# t 검정
+# (1). 일표본 t 검정 
+# (2). 이표본 t 검정
+# - 독립 / 대응
 
+from scipy.stats import ttest_rel # 대응형 t검정을 수행할 때 사용
 
+sub_lst = df_meat.SUBJECT.unique()
 
+df_kjmeat=df_meat[df_meat.LOCATION.isin(['KOR', 'JPN'])] # 해당 데이터만 필터링
+temp_data = df_meat[df_meat.SUBJECT == 'BEEF']
+table = pd.pivot(temp_data, 
+                 index='TIME', 
+                 columns="LOCATION", 
+                 values='Value').dropna()
 
+ttest_out=ttest_rel(table['KOR'], table['JPN'])
+ttest_out.pvalue # = 2.6431630595494026e-08
 
+# h0(귀무가설): 두집단 평균은 같다 muA == muB, muA - muB = 0
+# h1(대립가설): 두집단의 평균은 같지 않다. muA != muB, muA - muB != 0
+
+q2_res=[]
+
+for i in sub_lst:
+    df_kjmeat=df_meat[df_meat.LOCATION.isin(['KOR', 'JPN'])] # 해당 데이터만 필터링
+    temp_data = df_meat[df_meat.SUBJECT == i]
+    table = pd.pivot(temp_data, 
+                     index='TIME', 
+                     columns="LOCATION", 
+                     values='Value').dropna()
+    
+    ttest_out=ttest_rel(table['KOR'], table['JPN'])
+    pvalue=ttest_out.pvalue # = 2.6431630595494026e-08
+    q2_res.append([i, pvalue])
+    
+q2_res = pd.DataFrame(q2_res, columns =['sub', 'pvalue'])
+q2_res[q2_res.pvalue>=0.05]['sub']
+
+# 정답: POULTRY
+
+from scipy.stats import ttest_ind, bartlett, levene
+
+temp_data = df_meat[df_meat.SUBJECT == 'BEEF']
+tab1 = pd.pivot(temp_data, 
+                 index='TIME', 
+                 columns="LOCATION", 
+                 values='Value')
+
+bartlett(tab1['KOR'].dropna(), tab1['JPN'].dropna())
+
+#h0: 등분산 / h1: 이분산 (등분산 아니다)
+
+tt_out=ttest_ind(table['KOR'], table['JPN'], equal_var = False)
+pvalue1 = tt_out.pvalue # = 2.6431630595494026e-08 
+pvalue1
 #%%
 
 # =============================================================================
@@ -451,18 +537,174 @@ print(round(df_meat.groupby('TIME')['Value'].sum().reset_index(drop = False).cor
 # 
 # =============================================================================
 
+from sklearn.linear_model import LinearRegression #상수항 선택 가능
+from statsmodels.formula.api import ols #상수항 선택 가능
+from statsmodels.api import OLS, add_constant # 상수항 텀 추가 후 회귀 진행
+
+# 1. 한국만 포함한 데이터에서
+df_Kmeat = df_meat[df_meat.LOCATION =='KOR']
 
 
+# 2. Time을 독립변수, Value를 종속변수로 종류별로 회귀분석 수행
+
+# (1) LinearRegression: X는 2차식(2차원), y는 1차식(1차원)
+lr1 = LinearRegression(fit_intercept = True).fit(df_Kmeat[['TIME']],df_Kmeat['Value'])
+
+dir(lr1)
 
 
+lr1.intercept_
+lr1.coef_
+
+# 결정 계수를 이용할 때
+lr1.score(df_Kmeat[['TIME']],df_Kmeat['Value'])
+
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+
+pred = lr1.predict(df_Kmeat[['TIME']])
+mse=mean_absolute_error(df_Kmeat['Value'], pred)
+
+#(MAPE : Mean Absolute Percentage Error, 평균 절대 백분율 오차)
+# (MAPE = Σ ( | y - y ̂ | / y ) * 100/n ))
+mape = (abs(df_Kmeat["Value"] - pred) / df_Kmeat["Value"]).sum()*100/len(df_Kmeat)
 
 
+# 육류 종류 별로 완성하기
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+
+sub_lst = df_Kmeat.SUBJECT.unique()
+sub_lst
+
+# 반복을 돌려서 선형 회귀를 반복하여 육류 종류 별로 회귀 결과 도출
+
+q3_out=[]
+for i in sub_lst:
+    temp = df_Kmeat[df_Kmeat.SUBJECT == i]
+    
+    lr2 = LinearRegression(fit_intercept = True).fit(temp[['TIME']],temp['Value'])
+    r2=lr2.score(temp[['TIME']],temp['Value'])
+    
+    pred = lr2.predict(temp[['TIME']])
+    
+    #(MAPE : Mean Absolute Percentage Error, 평균 절대 백분율 오차)
+    # (MAPE = Σ ( | y - y ̂ | / y ) * 100/n ))
+    mape = (abs(temp["Value"] - pred) / temp["Value"]).sum()*100/len(df_Kmeat)
+    q3_out.append([i,r2,mape])
+
+# 가장 높은 결정 계수를 가진 모델의 학습 오차 중 mape 값 도출 및 반올림
+    
+q3_out = pd.DataFrame(q3_out, columns=['sub', 'r2', 'mape'])
+
+round(q3_out.loc[q3_out.r2.idxmax(),'mape'],2)
+
+## [참고]
+print(df_Kmeat['TIME'].shape)
+print(df_Kmeat['TIME'].ndim)
+print(df_Kmeat[['TIME']].shape)
+print(df_Kmeat[['TIME']].ndim)
+print(df_Kmeat['TIME'].values.reshape(-1,1).shape)
+print(df_Kmeat['TIME'].values.reshape(-1,1).ndim)
+
+# [참고2] 조금 더 코드 모양을 깔끔하게 만드는 방법
+for i in sub_lst:
+    temp = df_Kmeat[df_Kmeat.SUBJECT == i]
+    
+    globals()['lr_'+i] = LinearRegression(fit_intercept = True).fit(temp[['TIME']],temp['Value'])
+    
+#lr_BEEF.coef_
+#eval('lr_'+i)
+
+# ols
+# 문법: ols('y~x1+x2+x3-1', dataset).fit()
+# lm1 = ols('y~x1+x2+x3-1', dataset) # 다른 모델에 반복해서 써야될 때
+# lm2 = lm1.fit() 
+
+lm2=ols('Value~TIME', df_Kmeat).fit()
+dir(lm2)
+lm2.summary()
+
+#OLS Regression Results                            
+#==============================================================================
+#Dep. Variable:                  Value   R-squared:                       0.107
+#Model:                            OLS   Adj. R-squared:                  0.101
+#Method:                 Least Squares   F-statistic:                     17.21
+#Date:                Fri, 13 May 2022   Prob (F-statistic):           5.70e-05
+#Time:                        13:17:28   Log-Likelihood:                -516.62
+#No. Observations:                 146   AIC:                             1037.
+#Df Residuals:                     144   BIC:                             1043.
+#Df Model:                           1                                         
+#Covariance Type:            nonrobust                                         
+#==============================================================================
+#                coef      std err       t        P>|t|      [0.025      0.975]
+#----------
+#Intercept   -537.6899    132.239     -4.066      0.000    -799.070    -276.310
+#TIME           0.2731      0.066      4.148      0.000       0.143       0.403
+#==============================================================================
+#==============================================================================
+#Omnibus:                        6.442   Durbin-Watson:                   0.043
+#Prob(Omnibus):                  0.040   Jarque-Bera (JB):                3.528
+#Skew:                           0.153   Prob(JB):                        0.171
+#Kurtosis:                       2.303   Cond. No.                     3.83e+05
+#==============================================================================
+
+from statsmodels.stats.anova import anova_lm
+anova_lm(lm2)
+
+# F-statistic:                     17.21
+# Prob (F-statistic):           5.70e-05
+
+# h0[귀무]: B1 = B2 = B3
+# h1[대립]: 적어도 i하나에 대해서 Bi! = 0
+# 유의수준 0.05 하에 pvalue가 유의수준보다 작으면 귀무가설 기각
+# 유의 수준 0.05하에서 pvalue가 5.70e-05보다 작으므로 귀무가설 기각
 
 
+# h0:b0 == 0
+# h1:b1 != 0
 
+# h0:b0 == 0
+# h1:b1 != 0
 
+df_Kmeat[['TIME', "Value"]].plot(kind='scatter', x='TIME', y='Value')
+lm3 = ols('Value~TIME+SUBJECT',df_Kmeat).fit()
+lm3.summary()
 
+#OLS Regression Results                            
+#==============================================================================
+#Dep. Variable:                  Value   R-squared:                       0.926
+#Model:                            OLS   Adj. R-squared:                  0.924
+#Method:                 Least Squares   F-statistic:                     442.6
+#Date:                Fri, 13 May 2022   Prob (F-statistic):           1.02e-78
+#Time:                        13:45:08   Log-Likelihood:                -334.56
+#No. Observations:                 146   AIC:                             679.1
+#Df Residuals:                     141   BIC:                             694.0
+#Df Model:                           4                                         
+#Covariance Type:            nonrobust                                         
+#======================================================================================
+#                         coef    std err          t      P>|t|      [0.025      0.975]
+#--------------------------------------------------------------------------------------
+#Intercept           -520.0777     38.422    -13.536      0.000    -596.036    -444.119
+#SUBJECT[T.PIG]        13.9952      0.574     24.383      0.000      12.861      15.130
+#SUBJECT[T.POULTRY]     4.3373      0.570      7.607      0.000       3.210       5.465
+#SUBJECT[T.SHEEP]      -8.1322      0.570    -14.263      0.000      -9.259      -7.005
+#TIME                   0.2631      0.019     13.756      0.000       0.225       0.301
+#==============================================================================
+#Omnibus:                        2.541   Durbin-Watson:                   0.205
+#Prob(Omnibus):                  0.281   Jarque-Bera (JB):                2.528
+#Skew:                          -0.314   Prob(JB):                        0.283
+#Kurtosis:                       2.858   Cond. No.                     3.83e+05
+#==============================================================================
 
+tmp_df = df_Kmeat[['TIME','SUBJECT','Value']]
+tmp_dum = pd.get_dummies(tmp_df, columns=['SUBJECT'],drop_first=True)
+tmp_onehot = pd.get_dummies(tmp_df, columns=['SUBJECT'],drop_first=False)
+
+pred2 = lm2.predict(df_Kmeat['TIME'])
+pred3 = lm3.predict(df_Kmeat[['TIME', 'SUBJECT']])
+
+#print(mean_sqared_error(df_Kmeat[['Value']], pred2))
+print(mean_squared_error(df_Kmeat['Value'], pred2)) # 69.34278088859985
+mean_squared_error(df_Kmeat['Value'], pred3) # 5.726854954500384
 #%%
 
 # =============================================================================
